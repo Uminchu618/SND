@@ -21,5 +21,8 @@ pip install umap-learn[plot]
 
 
 # python main.py -a ppo --env coinrun --config 2 --device cuda --gpus 0 --num_threads 4
+# nohup python main.py -a ppo --env coinrun --config 4 --device cuda --gpus 0 -p --num_threads 4 --num_process 4 > output.log 2>&1 &
+# nohup python main.py -a ppo --env coinrun --config 4 --device cuda --gpus 0 --num_threads $(nproc) > output.log 2>&1 &
+
 
 
