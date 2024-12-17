@@ -206,7 +206,9 @@ class ExperimentNEnvPPO:
 
         s = numpy.zeros((n_env,) + self._env.observation_space.shape, dtype=numpy.float32)
         for i in range(n_env):
-            s[i] = self._env.reset(i)
+            observation, info = self._env.reset(i)
+            s[i] = observation
+
 
         state0 = self.process_state(s)
 
