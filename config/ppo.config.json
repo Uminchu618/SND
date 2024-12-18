@@ -872,7 +872,7 @@
       "type": "st-dim",
       "n_env": 128,
       "trials": 9,
-      "steps": 64,
+      "steps": 32,
       "gamma": "0.998,0.99",
       "beta": 0.001,
       "batch_size": 512,
