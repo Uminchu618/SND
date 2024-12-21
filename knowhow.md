@@ -42,3 +42,8 @@ ValueError: setting an array element with a sequence. The requested array has an
 /workspace/SND/experiment/ppo_nenv_experiment.pyの戻り値が異なっている。
 全てのコンフィグで起きるのではなく、モンテズマなどの特定のケースだけ発生する
 
+```diff
+-            observation = self._env.reset(i)
++            observation, info = self._env.reset(i)
+```
+
