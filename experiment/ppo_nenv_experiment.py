@@ -209,8 +209,8 @@ class ExperimentNEnvPPO:
             # observation, info = self._env.reset(i)
             observation = self._env.reset(i)
             s[i] = observation
-
-
+        # s.shape=(128, 6, 64, 64) 並列 128 環境 6フレーム、64x64画像
+        # numpy.save('s_data.npy', s) # テスト用
         state0 = self.process_state(s)
 
         while step_counter.running():
@@ -221,7 +221,14 @@ class ExperimentNEnvPPO:
 
             ext_reward = torch.tensor(reward, dtype=torch.float32)
             int_reward = agent.motivation.reward(state0).cpu().clip(0.0, 1.0)
-
+            
+            # Update reward based on conditions
+            done_tensor = torch.tensor(done, dtype=torch.float32).view(-1, 1)  # Ensure shape is (128, 1)
+            prev_level_complete_tensor = torch.tensor(info["prev_level_complete"], dtype=torch.float32).view(-1, 1)
+            # Check condition and update reward
+            mask = (prev_level_complete_tensor == 0) & (done_tensor == 1)
+            int_reward[mask] = -1 * int_reward[mask]
+            #print(int_reward)
             if info is not None:
                 if 'normalised_score' in info:
                     analytic.add(normalised_score=(1,))
