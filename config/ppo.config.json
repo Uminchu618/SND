@@ -1441,7 +1441,7 @@
       "model": "snd",
       "type": "vanilla",
       "n_env": 128,
-      "trials": 4,
+      "trials": 2,
       "steps": 40,
       "gamma": "0.998,0.99",
       "beta": 0.001,
