@@ -1442,7 +1442,7 @@
       "type": "vanilla",
       "n_env": 128,
       "trials": 4,
-      "steps": 40,
+      "steps": 64,
       "gamma": "0.998,0.99",
       "beta": 0.001,
       "batch_size": 512,
