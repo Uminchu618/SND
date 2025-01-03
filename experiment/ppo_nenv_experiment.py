@@ -306,7 +306,12 @@ class ExperimentNEnvPPO:
                 & (local_step_count < 1000)
             )
             # 内在的報酬への罰符
-            int_reward[death] = -10 + int_reward[death]
+            if step_counter.steps / step_counter.limit < 0.5:
+                int_reward[death] = int_reward[death] * 1.5  # 序盤は加算（死亡を促進）
+            else:
+                int_reward[death] = (
+                    int_reward[death] - 1
+                )  # 後半は減算（好奇心による死亡を抑制）
             if info is not None:
                 if "normalised_score" in info:
                     analytic.add(normalised_score=(1,))
@@ -336,7 +341,6 @@ class ExperimentNEnvPPO:
             for i, index in enumerate(env_indices):
                 # step_counter.update(int(stats['ext_reward'].step[i]))
                 reward_avg.update(stats["re"].sum[i])
-                print("local_step_count:" + str(local_step_count[i].item()))
                 print(
                     "Run {0:d} step {1:d}/{2:d} training [ext. reward {3:f} int. reward (max={4:f} mean={5:f} std={6:f}) steps {7:d}  mean reward {8:f} score {9:f} feature space (max={10:f} mean={11:f} std={12:f})] complete={13} seed={14} mask={15}".format(
                         trial,
