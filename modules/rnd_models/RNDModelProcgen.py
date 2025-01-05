@@ -6,7 +6,12 @@ import numpy as np
 
 from analytic.ResultCollector import ResultCollector
 from modules import init_orthogonal
-from modules.encoders.EncoderProcgen import ST_DIMEncoderProcgen, BarlowTwinsEncoderProcgen, VICRegEncoderProcgen, SNDVEncoderProcgen
+from modules.encoders.EncoderProcgen import (
+    ST_DIMEncoderProcgen,
+    BarlowTwinsEncoderProcgen,
+    VICRegEncoderProcgen,
+    SNDVEncoderProcgen,
+)
 from utils.RunningAverage import RunningStatsSimple
 
 
@@ -22,7 +27,9 @@ class RNDModelProcgen(nn.Module):
         input_width = self.input_shape[2]
         self.input_shape = (input_channels, input_height, input_width)
         self.feature_dim = 512
-        self.state_average = RunningStatsSimple((6, input_height, input_width), config.device)
+        self.state_average = RunningStatsSimple(
+            (6, input_height, input_width), config.device
+        )
 
         fc_inputs_count = 64 * (input_width // 8) * (input_height // 8)
 
@@ -34,7 +41,7 @@ class RNDModelProcgen(nn.Module):
             nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
             nn.ELU(),
             nn.Flatten(),
-            nn.Linear(fc_inputs_count, self.feature_dim)
+            nn.Linear(fc_inputs_count, self.feature_dim),
         )
 
         init_orthogonal(self.target_model[0], np.sqrt(2))
@@ -57,7 +64,7 @@ class RNDModelProcgen(nn.Module):
             nn.ELU(),
             nn.Linear(self.feature_dim, self.feature_dim),
             nn.ELU(),
-            nn.Linear(self.feature_dim, self.feature_dim)
+            nn.Linear(self.feature_dim, self.feature_dim),
         )
 
         init_orthogonal(self.model[0], np.sqrt(2))
@@ -69,7 +76,7 @@ class RNDModelProcgen(nn.Module):
 
     def prepare_input(self, state):
         x = state - self.state_average.mean
-        return x[:, 0:self.input_shape[0], :, :]
+        return x[:, 0 : self.input_shape[0], :, :]
 
     def forward(self, state):
         x = self.prepare_input(state)
@@ -80,7 +87,9 @@ class RNDModelProcgen(nn.Module):
     def error(self, state):
         with torch.no_grad():
             prediction, target = self(state)
-            error = torch.sum(torch.pow(target - prediction, 2), dim=1).unsqueeze(-1) / 2
+            error = (
+                torch.sum(torch.pow(target - prediction, 2), dim=1).unsqueeze(-1) / 2
+            )
 
         return error
 
@@ -117,9 +126,13 @@ class STDModelProcgen(nn.Module):
 
         fc_inputs_count = 64 * (input_width // 8) * (input_height // 8)
 
-        self.state_average = RunningStatsSimple((6, input_height, input_width), config.device)
+        self.state_average = RunningStatsSimple(
+            (6, input_height, input_width), config.device
+        )
 
-        self.target_model = ST_DIMEncoderProcgen(self.input_shape, self.feature_dim, config)
+        self.target_model = ST_DIMEncoderProcgen(
+            self.input_shape, self.feature_dim, config
+        )
 
         self.model = nn.Sequential(
             nn.Conv2d(input_channels, 32, kernel_size=3, stride=2, padding=1),
@@ -135,7 +148,7 @@ class STDModelProcgen(nn.Module):
             nn.ELU(),
             nn.Linear(self.feature_dim, self.feature_dim),
             nn.ELU(),
-            nn.Linear(self.feature_dim, self.feature_dim)
+            nn.Linear(self.feature_dim, self.feature_dim),
         )
 
         gain = 0.5
@@ -153,9 +166,11 @@ class STDModelProcgen(nn.Module):
         if self.config.cnd_preprocess == 1:
             x = state - self.state_average.mean
         if self.config.cnd_preprocess == 2:
-            x = ((state - self.state_average.mean) / self.state_average.std).clip(-1., 1.)
+            x = ((state - self.state_average.mean) / self.state_average.std).clip(
+                -1.0, 1.0
+            )
 
-        return x[:, 0:self.input_shape[0], :, :]
+        return x[:, 0 : self.input_shape[0], :, :]
 
     def forward(self, state, fmaps=False):
         s = self.preprocess(state)
@@ -167,10 +182,10 @@ class STDModelProcgen(nn.Module):
             target_code = self.target_model(s, fmaps)
 
             return {
-                'predicted_f5': f5.permute(0, 2, 3, 1),
-                'predicted_code': predicted_code,
-                'target_f5': target_code['f5'],
-                'target_code': target_code['out']
+                "predicted_f5": f5.permute(0, 2, 3, 1),
+                "predicted_code": predicted_code,
+                "target_f5": target_code["f5"],
+                "target_code": target_code["out"],
             }
         else:
             target_code = self.target_model(s).detach()
@@ -186,17 +201,28 @@ class STDModelProcgen(nn.Module):
             # if self.config.cnd_error_k == 1:
             #     error = torch.mean(torch.abs(target - prediction), dim=1, keepdim=True)
 
-            error = self.k_distance(self.config.cnd_error_k, prediction, target, reduction='mean')
+            error = self.k_distance(
+                self.config.cnd_error_k, prediction, target, reduction="mean"
+            )
 
         return error
 
     def loss_function_crossentropy(self, state, next_state):
         out = self(state, fmaps=True)
-        prediction_f5, prediction, target_f5, target = out['predicted_f5'], out['predicted_code'], out['target_f5'], out['target_code']
+        prediction_f5, prediction, target_f5, target = (
+            out["predicted_f5"],
+            out["predicted_code"],
+            out["target_f5"],
+            out["target_code"],
+        )
 
-        loss_prediction = nn.functional.mse_loss(prediction, target.detach(), reduction='sum')  # + nn.functional.mse_loss(prediction_f5, target_f5.detach(), reduction='sum')
+        loss_prediction = nn.functional.mse_loss(
+            prediction, target.detach(), reduction="sum"
+        )  # + nn.functional.mse_loss(prediction_f5, target_f5.detach(), reduction='sum')
 
-        loss_target, loss_target_norm = self.target_model.loss_function_crossentropy(self.preprocess(state), self.preprocess(next_state))
+        loss_target, loss_target_norm = self.target_model.loss_function_crossentropy(
+            self.preprocess(state), self.preprocess(next_state)
+        )
 
         # target_logits = torch.pow(target, 2) # 42
         # target_logits = torch.abs(target)  # 43
@@ -209,30 +235,48 @@ class STDModelProcgen(nn.Module):
         beta2 = self.config.cnd_loss_target_reg
 
         analytic = ResultCollector()
-        analytic.update(loss_prediction=loss_prediction.unsqueeze(-1).detach(), loss_target=loss_target.unsqueeze(-1).detach(), loss_target_norm=loss_target_norm.detach() * beta2,
-                        loss_reg=loss_target_uniform.detach() * beta1)
+        analytic.update(
+            loss_prediction=loss_prediction.unsqueeze(-1).detach(),
+            loss_target=loss_target.unsqueeze(-1).detach(),
+            loss_target_norm=loss_target_norm.detach() * beta2,
+            loss_reg=loss_target_uniform.detach() * beta1,
+        )
 
-        return loss_prediction * self.config.cnd_loss_pred + (loss_target + loss_target_uniform * beta1 + loss_target_norm * beta2) * self.config.cnd_loss_target
+        return (
+            loss_prediction * self.config.cnd_loss_pred
+            + (loss_target + loss_target_uniform * beta1 + loss_target_norm * beta2)
+            * self.config.cnd_loss_target
+        )
 
     def loss_function_cdist(self, state, next_state):
         prediction, target = self(state)
         loss_prediction = nn.functional.mse_loss(prediction, target)
-        loss_target = self.target_model.loss_function_cdist(self.preprocess(state), self.preprocess(next_state))
+        loss_target = self.target_model.loss_function_cdist(
+            self.preprocess(state), self.preprocess(next_state)
+        )
 
         analytic = ResultCollector()
-        analytic.update(loss_prediction=loss_prediction.unsqueeze(-1).detach(), loss_target=loss_target.unsqueeze(-1).detach(), loss_reg=torch.zeros(1), loss_target_norm=torch.zeros(1))
+        analytic.update(
+            loss_prediction=loss_prediction.unsqueeze(-1).detach(),
+            loss_target=loss_target.unsqueeze(-1).detach(),
+            loss_reg=torch.zeros(1),
+            loss_target_norm=torch.zeros(1),
+        )
 
-        return loss_prediction * self.config.cnd_loss_pred + loss_target * self.config.cnd_loss_target
+        return (
+            loss_prediction * self.config.cnd_loss_pred
+            + loss_target * self.config.cnd_loss_target
+        )
 
     def loss_function(self, state, next_state):
         return self.loss_function_crossentropy(state, next_state)
 
     @staticmethod
-    def k_distance(k, prediction, target, reduction='sum'):
+    def k_distance(k, prediction, target, reduction="sum"):
         ret = torch.abs(target - prediction) + 1e-8
-        if reduction == 'sum':
+        if reduction == "sum":
             ret = ret.pow(k).sum(dim=1, keepdim=True)
-        if reduction == 'mean':
+        if reduction == "mean":
             ret = ret.pow(k).mean(dim=1, keepdim=True)
 
         return ret
@@ -257,30 +301,29 @@ class SNDVModelProcgen(nn.Module):
 
         fc_inputs_count = 64 * (input_width // 8) * (input_height // 8)
 
-        self.state_average = RunningStatsSimple((6, input_height, input_width), config.device)
+        self.state_average = RunningStatsSimple(
+            (6, input_height, input_width), config.device
+        )
 
-        self.target_model = SNDVEncoderProcgen(self.input_shape, self.feature_dim, config)
+        self.target_model = SNDVEncoderProcgen(
+            self.input_shape, self.feature_dim, config
+        )
 
         self.model = nn.Sequential(
             nn.Conv2d(input_channels, 16, kernel_size=3, stride=2, padding=1),
             nn.ELU(),
-
             nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),
             nn.ELU(),
-
             nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
             nn.ELU(),
-
             nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
             nn.ELU(),
-
             nn.Flatten(),
-
             nn.Linear(fc_inputs_count, self.feature_dim),
             nn.ELU(),
             nn.Linear(self.feature_dim, self.feature_dim),
             nn.ELU(),
-            nn.Linear(self.feature_dim, self.feature_dim)
+            nn.Linear(self.feature_dim, self.feature_dim),
         )
 
         gain = sqrt(2)
@@ -298,9 +341,11 @@ class SNDVModelProcgen(nn.Module):
         if self.config.cnd_preprocess == 1:
             x = state - self.state_average.mean
         if self.config.cnd_preprocess == 2:
-            x = ((state - self.state_average.mean) / self.state_average.std).clip(-1., 1.)
+            x = ((state - self.state_average.mean) / self.state_average.std).clip(
+                -1.0, 1.0
+            )
 
-        return x[:, 0:self.input_shape[0], :, :]
+        return x[:, 0 : self.input_shape[0], :, :]
 
     def forward(self, state):
         s = self.preprocess(state)
@@ -317,16 +362,38 @@ class SNDVModelProcgen(nn.Module):
 
         return error
 
-    def sample_states(self, states, batch_size, far_ratio=0.5, device='cpu'):
+    def sample_states(self, states, batch_size, far_ratio=0.5, device="cpu"):
         count = self.config.trajectory_size
+        n_env = self.config.n_env  # 環境数
+        steps_per_env = count // n_env  # 環境ごとのステップ数
 
         indices_a = torch.randint(0, count, size=(batch_size,), device=device)
+        # 同じ環境内で前後 1 フレームからランダムに選択するロジック
+        env_index = indices_a % n_env
+        step_index = indices_a // n_env
 
-        indices_close = indices_a
+        # 前後1フレームのインデックスを計算
+        step_prev = torch.clamp(step_index - 1, min=0)
+        step_next = torch.clamp(step_index + 1, max=steps_per_env - 1)
+
+        # 前後のステップをフラットなインデックスに変換
+        indices_prev = step_prev * n_env + env_index
+        indices_next = step_next * n_env + env_index
+
+        # ランダムに前後のステップを選択
+        # ランダムに前後および現在のステップを選択
+        rand_choice = torch.randint(
+            0, 3, size=(batch_size,), device=device
+        )  # 0: prev, 1: current, 2: next
+        indices_close = torch.where(
+            rand_choice == 0,
+            indices_prev,
+            torch.where(rand_choice == 1, indices_a, indices_next),
+        )
 
         indices_far = torch.randint(0, count, size=(batch_size,), device=device)
 
-        labels = (torch.rand(batch_size, device=device) > far_ratio)
+        labels = torch.rand(batch_size, device=device) > far_ratio
 
         # label 0 = close states
         # label 1 = distant states
@@ -336,7 +403,11 @@ class SNDVModelProcgen(nn.Module):
         states_b = torch.index_select(states, dim=0, index=indices_b).float()
         labels_t = labels.float()
 
-        return states_a.to(self.config.device), states_b.to(self.config.device), labels_t.to(self.config.device)
+        return (
+            states_a.to(self.config.device),
+            states_b.to(self.config.device),
+            labels_t.to(self.config.device),
+        )
 
     def loss_function(self, state_batch, state, dropout=0.75):
         state_norm_t = self.preprocess(state_batch).detach()
@@ -347,17 +418,21 @@ class SNDVModelProcgen(nn.Module):
         loss_cnd = (features_target_t - features_predicted_t) ** 2
 
         # random loss regularization, 25% non zero for 128envs, 100% non zero for 32envs
-        '''
+        """
         prob            = 1.0 - dropout
         random_mask     = torch.rand(loss_cnd.shape).to(loss_cnd.device)
         random_mask     = 1.0*(random_mask < prob) 
         loss_cnd        = (loss_cnd*random_mask).sum() / (random_mask.sum() + 0.00000001)
-        '''
+        """
         random_mask = (torch.rand_like(loss_cnd) > dropout).float()
         loss_cnd = (loss_cnd * random_mask).sum() / (random_mask.sum() + 0.00000001)
 
-        states_a, states_b, target = self.sample_states(state, self.config.batch_size // 8)
-        loss_target = self.target_model.loss_function(self.preprocess(states_a), self.preprocess(states_b), target)
+        states_a, states_b, target = self.sample_states(
+            state, self.config.batch_size // 8
+        )
+        loss_target = self.target_model.loss_function(
+            self.preprocess(states_a), self.preprocess(states_b), target
+        )
 
         return loss_cnd + loss_target
 
@@ -381,9 +456,13 @@ class BarlowTwinsModelProcgen(nn.Module):
 
         fc_inputs_count = 128 * (input_width // 8) * (input_height // 8)
 
-        self.state_average = RunningStatsSimple((6, input_height, input_width), config.device)
+        self.state_average = RunningStatsSimple(
+            (6, input_height, input_width), config.device
+        )
 
-        self.target_model = BarlowTwinsEncoderProcgen(self.input_shape, self.feature_dim, config)
+        self.target_model = BarlowTwinsEncoderProcgen(
+            self.input_shape, self.feature_dim, config
+        )
 
         self.model = nn.Sequential(
             nn.Conv2d(input_channels, 32, kernel_size=3, stride=2, padding=1),
@@ -399,7 +478,7 @@ class BarlowTwinsModelProcgen(nn.Module):
             nn.ELU(),
             nn.Linear(self.feature_dim, self.feature_dim),
             nn.ELU(),
-            nn.Linear(self.feature_dim, self.feature_dim)
+            nn.Linear(self.feature_dim, self.feature_dim),
         )
 
         gain = sqrt(2)
@@ -412,7 +491,7 @@ class BarlowTwinsModelProcgen(nn.Module):
         init_orthogonal(self.model[13], gain)
 
     def preprocess(self, state):
-        return state[:, 0:self.input_shape[0], :, :]
+        return state[:, 0 : self.input_shape[0], :, :]
 
     def forward(self, state):
         predicted_code = self.model(self.preprocess(state))
@@ -423,27 +502,36 @@ class BarlowTwinsModelProcgen(nn.Module):
     def error(self, state):
         with torch.no_grad():
             prediction, target = self(state)
-            error = self.k_distance(self.config.cnd_error_k, prediction, target, reduction='mean')
+            error = self.k_distance(
+                self.config.cnd_error_k, prediction, target, reduction="mean"
+            )
 
         return error
 
     def loss_function(self, state, next_state):
         prediction, target = self(state)
 
-        loss_prediction = nn.functional.mse_loss(prediction, target.detach(), reduction='mean')
-        loss_target = self.target_model.loss_function(self.preprocess(state), self.preprocess(next_state))
+        loss_prediction = nn.functional.mse_loss(
+            prediction, target.detach(), reduction="mean"
+        )
+        loss_target = self.target_model.loss_function(
+            self.preprocess(state), self.preprocess(next_state)
+        )
 
         analytic = ResultCollector()
-        analytic.update(loss_prediction=loss_prediction.unsqueeze(-1).detach(), loss_target=loss_target.unsqueeze(-1).detach())
+        analytic.update(
+            loss_prediction=loss_prediction.unsqueeze(-1).detach(),
+            loss_target=loss_target.unsqueeze(-1).detach(),
+        )
 
         return loss_prediction + loss_target
 
     @staticmethod
-    def k_distance(k, prediction, target, reduction='sum'):
+    def k_distance(k, prediction, target, reduction="sum"):
         ret = torch.abs(target - prediction) + 1e-8
-        if reduction == 'sum':
+        if reduction == "sum":
             ret = ret.pow(k).sum(dim=1, keepdim=True)
-        if reduction == 'mean':
+        if reduction == "mean":
             ret = ret.pow(k).mean(dim=1, keepdim=True)
 
         return ret
@@ -468,9 +556,13 @@ class VICRegModelProcgen(nn.Module):
 
         fc_inputs_count = 128 * (input_width // 8) * (input_height // 8)
 
-        self.state_average = RunningStatsSimple((6, input_height, input_width), config.device)
+        self.state_average = RunningStatsSimple(
+            (6, input_height, input_width), config.device
+        )
 
-        self.target_model = VICRegEncoderProcgen(self.input_shape, self.feature_dim, config)
+        self.target_model = VICRegEncoderProcgen(
+            self.input_shape, self.feature_dim, config
+        )
 
         self.model = nn.Sequential(
             nn.Conv2d(input_channels, 32, kernel_size=3, stride=2, padding=1),
@@ -486,7 +578,7 @@ class VICRegModelProcgen(nn.Module):
             nn.ELU(),
             nn.Linear(self.feature_dim, self.feature_dim),
             nn.ELU(),
-            nn.Linear(self.feature_dim, self.feature_dim)
+            nn.Linear(self.feature_dim, self.feature_dim),
         )
 
         gain = sqrt(2)
@@ -499,7 +591,7 @@ class VICRegModelProcgen(nn.Module):
         init_orthogonal(self.model[13], gain)
 
     def preprocess(self, state):
-        return state[:, 0:self.input_shape[0], :, :]
+        return state[:, 0 : self.input_shape[0], :, :]
 
     def forward(self, state):
         predicted_code = self.model(self.preprocess(state))
@@ -510,27 +602,36 @@ class VICRegModelProcgen(nn.Module):
     def error(self, state):
         with torch.no_grad():
             prediction, target = self(state)
-            error = self.k_distance(self.config.cnd_error_k, prediction, target, reduction='mean')
+            error = self.k_distance(
+                self.config.cnd_error_k, prediction, target, reduction="mean"
+            )
 
         return error
 
     def loss_function(self, state, next_state):
         prediction, target = self(state)
 
-        loss_prediction = nn.functional.mse_loss(prediction, target.detach(), reduction='mean')
-        loss_target = self.target_model.loss_function(self.preprocess(state), self.preprocess(next_state))
+        loss_prediction = nn.functional.mse_loss(
+            prediction, target.detach(), reduction="mean"
+        )
+        loss_target = self.target_model.loss_function(
+            self.preprocess(state), self.preprocess(next_state)
+        )
 
         analytic = ResultCollector()
-        analytic.update(loss_prediction=loss_prediction.unsqueeze(-1).detach(), loss_target=loss_target.unsqueeze(-1).detach())
+        analytic.update(
+            loss_prediction=loss_prediction.unsqueeze(-1).detach(),
+            loss_target=loss_target.unsqueeze(-1).detach(),
+        )
 
         return loss_prediction + loss_target
 
     @staticmethod
-    def k_distance(k, prediction, target, reduction='sum'):
+    def k_distance(k, prediction, target, reduction="sum"):
         ret = torch.abs(target - prediction) + 1e-8
-        if reduction == 'sum':
+        if reduction == "sum":
             ret = ret.pow(k).sum(dim=1, keepdim=True)
-        if reduction == 'mean':
+        if reduction == "mean":
             ret = ret.pow(k).mean(dim=1, keepdim=True)
 
         return ret
@@ -548,7 +649,7 @@ class VINVModelProcgen(VICRegModelProcgen):
             nn.ReLU(),
             nn.Linear(self.feature_dim, self.feature_dim // 2),
             nn.ReLU(),
-            nn.Linear(self.feature_dim // 2, action_dim)
+            nn.Linear(self.feature_dim // 2, action_dim),
         )
 
         gain = sqrt(2)
@@ -567,10 +668,18 @@ class VINVModelProcgen(VICRegModelProcgen):
 
         iota = 0.5
         loss_inv = nn.functional.cross_entropy(action_logits, action_target) * iota
-        loss_prediction = nn.functional.mse_loss(prediction, target.detach(), reduction='mean')
-        loss_target = self.target_model.loss_function(self.preprocess(state), self.preprocess(next_state))
+        loss_prediction = nn.functional.mse_loss(
+            prediction, target.detach(), reduction="mean"
+        )
+        loss_target = self.target_model.loss_function(
+            self.preprocess(state), self.preprocess(next_state)
+        )
 
         analytic = ResultCollector()
-        analytic.update(loss_prediction=loss_prediction.unsqueeze(-1).detach(), loss_target=loss_target.unsqueeze(-1).detach(), inv_accuracy=accuracy.unsqueeze(-1).detach())
+        analytic.update(
+            loss_prediction=loss_prediction.unsqueeze(-1).detach(),
+            loss_target=loss_target.unsqueeze(-1).detach(),
+            inv_accuracy=accuracy.unsqueeze(-1).detach(),
+        )
 
         return loss_prediction + loss_target + loss_inv
