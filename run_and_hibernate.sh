@@ -20,3 +20,5 @@ $HIBERNATE_SCRIPT "$INSTANCE_ID"
 echo "Hibernate script executed."
 
 # nohup ./run_and_hibernate.sh > run_and_hibernate.log 2>&1 &
+nohup python main.py -a ppo --env pitfall --config 8 --device cuda --gpus 0 --num_threads 4 > ../assets/nohup.out.pitfall 2>&1 &
+nohup python main.py -a ppo --env montezuma --config 49 --device cuda --gpus 0 --num_threads 4 > ../assets/nohup.out.montezuma 2>&1 &
